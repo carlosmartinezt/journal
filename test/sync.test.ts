@@ -159,6 +159,32 @@ describe('deletion', () => {
   })
 })
 
+describe('backdated import propagation (server_updated_at cursor)', () => {
+  it('pulls an old-dated entry written to the server after this device synced', async () => {
+    // Simulate an entry imported on another device: its logical date is years
+    // ago, but it was written to the server "now".
+    gateway.entries.set('imp-1', {
+      id: 'imp-1',
+      user_id: USER,
+      title: 'From 2019',
+      content: { type: 'doc', content: [] },
+      plain_text: 'old note',
+      journal_date: '2019-08-19',
+      created_at: '2019-08-19T00:00:00.000Z',
+      updated_at: '2019-08-19T00:00:00.000Z', // logical: years ago
+      server_updated_at: '2026-08-10T00:00:00.000Z', // written to server now
+      deleted_at: null,
+    })
+    // This device's cursor is AFTER the entry's logical date — an updated_at
+    // cursor would wrongly skip it.
+    await meta.setPullCursor('2020-01-01T00:00:00.000Z')
+
+    await engine.sync()
+
+    expect((await db.entries.get('imp-1'))?.title).toBe('From 2019')
+  })
+})
+
 describe('duplicate prevention / idempotency', () => {
   it('many edits + repeated syncs yield exactly one server row', async () => {
     const entry = await entriesRepo.create({ userId: USER, title: 'a' })

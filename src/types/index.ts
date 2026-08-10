@@ -137,6 +137,8 @@ export interface RemoteEntry {
   journal_date: string
   created_at: string
   updated_at: string
+  /** Server wall-clock write time — the sync pull cursor (not the logical date). */
+  server_updated_at: string
   deleted_at: string | null
 }
 
@@ -152,5 +154,6 @@ export interface RemotePhoto {
   sort_order: number
   created_at: string
   updated_at: string
+  server_updated_at: string
   deleted_at: string | null
 }

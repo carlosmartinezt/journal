@@ -34,7 +34,10 @@ export class FakeGateway implements RemoteGateway {
 
   async upsertEntry(entry: Entry): Promise<{ updatedAt: string }> {
     this.upsertEntryCalls++
-    const updatedAt = this.clock.nextIso()
+    // updated_at is the client's logical timestamp; server_updated_at is the
+    // server's monotonic write time (the pull cursor) — as in production.
+    const serverUpdatedAt = this.clock.nextIso()
+    const updatedAt = new Date(entry.updatedAt).toISOString()
     this.entries.set(entry.id, {
       id: entry.id,
       user_id: entry.userId,
@@ -44,30 +47,33 @@ export class FakeGateway implements RemoteGateway {
       journal_date: entry.journalDate,
       created_at: new Date(entry.createdAt).toISOString(),
       updated_at: updatedAt,
+      server_updated_at: serverUpdatedAt,
       deleted_at: entry.deletedAt ? new Date(entry.deletedAt).toISOString() : null,
     })
     return { updatedAt }
   }
 
   async deleteEntry(entry: Entry): Promise<{ updatedAt: string }> {
-    const updatedAt = this.clock.nextIso()
+    const updatedAt = new Date(entry.updatedAt).toISOString()
     const existing = this.entries.get(entry.id)
     if (existing) {
       existing.deleted_at = new Date(entry.deletedAt ?? Date.now()).toISOString()
       existing.updated_at = updatedAt
+      existing.server_updated_at = this.clock.nextIso()
     }
     return { updatedAt }
   }
 
   async pullEntries(userId: string, since: string | null): Promise<RemoteEntry[]> {
     return [...this.entries.values()]
-      .filter((e) => e.user_id === userId && (!since || e.updated_at > since))
-      .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
+      .filter((e) => e.user_id === userId && (!since || e.server_updated_at > since))
+      .sort((a, b) => a.server_updated_at.localeCompare(b.server_updated_at))
   }
 
   async uploadPhoto(photo: Photo): Promise<{ storagePath: string; updatedAt: string }> {
     this.uploadPhotoCalls++
-    const updatedAt = this.clock.nextIso()
+    const serverUpdatedAt = this.clock.nextIso()
+    const updatedAt = new Date(photo.updatedAt).toISOString()
     const path = `${photo.userId}/${photo.entryId}/${photo.id}.jpg`
     if (photo.blob) this.objects.set(path, photo.blob)
     this.photos.set(photo.id, {
@@ -81,17 +87,19 @@ export class FakeGateway implements RemoteGateway {
       sort_order: photo.order,
       created_at: new Date(photo.createdAt).toISOString(),
       updated_at: updatedAt,
+      server_updated_at: serverUpdatedAt,
       deleted_at: null,
     })
     return { storagePath: path, updatedAt }
   }
 
   async deletePhoto(photo: Photo): Promise<{ updatedAt: string }> {
-    const updatedAt = this.clock.nextIso()
+    const updatedAt = new Date(photo.updatedAt).toISOString()
     const existing = this.photos.get(photo.id)
     if (existing) {
       existing.deleted_at = new Date(photo.deletedAt ?? Date.now()).toISOString()
       existing.updated_at = updatedAt
+      existing.server_updated_at = this.clock.nextIso()
     }
     if (photo.storagePath) this.objects.delete(photo.storagePath)
     return { updatedAt }
@@ -99,8 +107,8 @@ export class FakeGateway implements RemoteGateway {
 
   async pullPhotos(userId: string, since: string | null): Promise<RemotePhoto[]> {
     return [...this.photos.values()]
-      .filter((p) => p.user_id === userId && (!since || p.updated_at > since))
-      .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
+      .filter((p) => p.user_id === userId && (!since || p.server_updated_at > since))
+      .sort((a, b) => a.server_updated_at.localeCompare(b.server_updated_at))
   }
 
   async downloadPhoto(storagePath: string): Promise<Blob> {

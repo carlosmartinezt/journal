@@ -209,9 +209,14 @@ sync failures without touching Wi-Fi.
   running sync any number of times never creates duplicates. If an entry is
   edited during its network round-trip, it stays pending and isn't marked
   synced.
-- **Pull:** fetches rows with `updated_at` greater than a stored cursor (with a
-  small overlap window to avoid missing concurrent writes). Re-pulling is
-  harmless (idempotent local upserts).
+- **Pull:** fetches rows with `server_updated_at` greater than a stored cursor,
+  paged past the API row cap. The cursor tracks `server_updated_at` — a
+  server-managed write time — NOT the entry's logical `updated_at`, so imported
+  entries with old dates (e.g. a Day One archive back to 2019) still propagate
+  to devices whose cursor is already recent. A small overlap window avoids
+  missing concurrent writes; re-pulling is harmless (idempotent upserts).
+  Settings → "Reload everything from server" clears the cursor for a full
+  re-pull if a device ever drifts.
 - **Soft deletes:** deletions are tombstones (`deleted_at`), so a pull can't
   resurrect a deleted entry.
 - **Decoupling:** the engine depends only on a `RemoteGateway` interface

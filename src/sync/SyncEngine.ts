@@ -140,6 +140,17 @@ export class SyncEngine {
     await this.sync()
   }
 
+  /**
+   * Force a full re-pull from the server: clears the pull cursor so the next
+   * sync fetches every row (paginated), then syncs. Local unsynced changes are
+   * preserved — the pull only upserts. Used by the "Reload from server" action
+   * to recover from a stale/advanced cursor.
+   */
+  async reloadFromServer(): Promise<void> {
+    await meta.clearSyncState()
+    await this.syncNow()
+  }
+
   // ---- the sync cycle ----------------------------------------------------
 
   async sync(): Promise<void> {
@@ -320,13 +331,15 @@ export class SyncEngine {
 
     let maxSeen = cursor ? Date.parse(cursor) : 0
 
+    // The cursor tracks server_updated_at (server write time), NOT the entry's
+    // logical updated_at — so backdated imports still advance/pass the cursor.
     for (const re of remoteEntries) {
       await this.mergeRemoteEntry(re)
-      maxSeen = Math.max(maxSeen, Date.parse(re.updated_at))
+      maxSeen = Math.max(maxSeen, Date.parse(re.server_updated_at))
     }
     for (const rp of remotePhotos) {
       await this.mergeRemotePhoto(rp)
-      maxSeen = Math.max(maxSeen, Date.parse(rp.updated_at))
+      maxSeen = Math.max(maxSeen, Date.parse(rp.server_updated_at))
     }
 
     // Fetch bytes for any photos we know about but don't have locally.

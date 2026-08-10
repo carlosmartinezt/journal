@@ -55,16 +55,38 @@ export class SupabaseGateway implements RemoteGateway {
   }
 
   async pullEntries(userId: string, since: string | null): Promise<RemoteEntry[]> {
-    let q = this.client
-      .from('journal_entries')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: true })
-      .limit(1000)
-    if (since) q = q.gt('updated_at', since)
-    const { data, error } = await q
-    if (error) throw new Error(`pullEntries: ${error.message}`)
-    return (data ?? []) as RemoteEntry[]
+    return this.pullPaged<RemoteEntry>('journal_entries', userId, since)
+  }
+
+  /**
+   * Fetch all rows changed since `since`, paging past the PostgREST row cap.
+   * Filters + orders by server_updated_at (the write-time cursor), with id as a
+   * tiebreaker so offset paging is stable even when timestamps collide (e.g. a
+   * bulk import/migration).
+   */
+  private async pullPaged<T>(
+    table: 'journal_entries' | 'journal_photos',
+    userId: string,
+    since: string | null,
+  ): Promise<T[]> {
+    const pageSize = 1000
+    const out: T[] = []
+    for (let from = 0; ; from += pageSize) {
+      let q = this.client
+        .from(table)
+        .select('*')
+        .eq('user_id', userId)
+        .order('server_updated_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + pageSize - 1)
+      if (since) q = q.gt('server_updated_at', since)
+      const { data, error } = await q
+      if (error) throw new Error(`pull ${table}: ${error.message}`)
+      const rows = (data ?? []) as T[]
+      out.push(...rows)
+      if (rows.length < pageSize) break
+    }
+    return out
   }
 
   async uploadPhoto(photo: Photo): Promise<{ storagePath: string; updatedAt: string }> {
@@ -124,16 +146,7 @@ export class SupabaseGateway implements RemoteGateway {
   }
 
   async pullPhotos(userId: string, since: string | null): Promise<RemotePhoto[]> {
-    let q = this.client
-      .from('journal_photos')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: true })
-      .limit(2000)
-    if (since) q = q.gt('updated_at', since)
-    const { data, error } = await q
-    if (error) throw new Error(`pullPhotos: ${error.message}`)
-    return (data ?? []) as RemotePhoto[]
+    return this.pullPaged<RemotePhoto>('journal_photos', userId, since)
   }
 
   async downloadPhoto(storagePath: string): Promise<Blob> {

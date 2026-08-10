@@ -43,6 +43,17 @@ export function SettingsPage() {
         >
           Sync now
         </button>
+        <button
+          onClick={() => void syncEngine.reloadFromServer()}
+          disabled={!online}
+          className="mt-2 w-full rounded-xl border border-line py-3 text-center font-medium text-ink active:bg-line disabled:opacity-40"
+        >
+          Reload everything from server
+        </button>
+        <p className="px-1 pt-2 text-xs text-ink-faint">
+          Re-downloads all your entries from the server. Use this if a device is
+          missing entries. Your local changes are kept.
+        </p>
       </Section>
 
       <Section title="Day One">
