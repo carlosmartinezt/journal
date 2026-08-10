@@ -104,17 +104,41 @@ export function stripMomentRefs(text: string): string {
     .trim()
 }
 
-/** Extract a leading H1/H2 as the entry title, returning the remaining body. */
+/** Longest first line we'll promote to a title when it isn't a heading. */
+const TITLE_MAX_LEN = 140
+
+/**
+ * Reverse CommonMark backslash escaping (e.g. `\(` → `(`). Day One escapes
+ * punctuation in its exported markdown; titles are extracted raw (not through
+ * the markdown parser), so they need un-escaping here. Bodies are handled by
+ * the parser and don't go through this.
+ */
+export function unescapeMarkdown(s: string): string {
+  return s.replace(/\\([\\`*_{}[\]()#+\-.!>~|"'])/g, '$1')
+}
+
+/**
+ * Derive the entry title from Day One markdown. Day One treats the first line
+ * as the title, so we promote it whether or not it's a `#` heading — but only
+ * when it's short enough to plausibly be a title (headings always qualify), so
+ * a long free-form paragraph isn't turned into a giant title. The title is
+ * un-escaped; the remaining lines become the body.
+ */
 export function splitTitle(md: string): { title: string; body: string } {
-  const lines = md.split('\n')
-  let i = 0
-  while (i < lines.length && lines[i].trim() === '') i++
-  const first = lines[i]?.trim() ?? ''
-  const m = first.match(/^#{1,2}\s+(.*)$/)
-  if (m) {
-    const title = m[1].trim()
-    const body = lines.slice(i + 1).join('\n').trim()
-    return { title, body }
+  const text = md.trim()
+  if (!text) return { title: '', body: '' }
+
+  const nl = text.indexOf('\n')
+  const firstRaw = (nl === -1 ? text : text.slice(0, nl)).trim()
+  const rest = nl === -1 ? '' : text.slice(nl + 1).trim()
+
+  const heading = firstRaw.match(/^#{1,6}\s+(.*)$/)
+  const firstContent = heading ? heading[1].trim() : firstRaw
+  const isTitle = Boolean(heading) || firstContent.length <= TITLE_MAX_LEN
+
+  if (isTitle && firstContent) {
+    return { title: unescapeMarkdown(firstContent), body: rest }
   }
-  return { title: '', body: md.trim() }
+  // Long, un-headed first line → keep the whole thing as the body.
+  return { title: '', body: text }
 }

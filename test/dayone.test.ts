@@ -5,6 +5,7 @@ import { db } from '../src/db/local/db'
 import { entriesRepo } from '../src/db/local/entriesRepo'
 import { photosRepo } from '../src/db/local/photosRepo'
 import { markdownToTipTap, tipTapToMarkdown } from '../src/lib/dayone/markdown'
+import { splitTitle } from '../src/lib/dayone/common'
 import { importDayOne } from '../src/lib/dayone/importer'
 import { exportDayOne } from '../src/lib/dayone/exporter'
 import { makeFakePlatform } from './fakes'
@@ -39,6 +40,33 @@ describe('markdown <-> tiptap', () => {
     expect(back).toContain('**bold**')
     expect(back).toContain('## Section')
     expect(back).toMatch(/- a/)
+  })
+})
+
+describe('title extraction from Day One markdown', () => {
+  it('un-escapes markdown punctuation in the title', () => {
+    expect(splitTitle('# Barcelona \\(Unexpectedly\\)\n\nWe came here.').title).toBe(
+      'Barcelona (Unexpectedly)',
+    )
+  })
+
+  it('promotes a plain first line (no #) to the title', () => {
+    const r = splitTitle('Arrived at JFK!')
+    expect(r.title).toBe('Arrived at JFK!')
+    expect(r.body).toBe('')
+  })
+
+  it('splits a plain title line from its body', () => {
+    const r = splitTitle('The truth is costly\n\nWhereas fiction is cheap.')
+    expect(r.title).toBe('The truth is costly')
+    expect(r.body).toBe('Whereas fiction is cheap.')
+  })
+
+  it('does not turn a long free-form paragraph into a title', () => {
+    const long = 'x'.repeat(200)
+    const r = splitTitle(long)
+    expect(r.title).toBe('')
+    expect(r.body).toBe(long)
   })
 })
 
