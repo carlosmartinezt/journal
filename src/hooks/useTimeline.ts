@@ -1,8 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/local/db'
-import { parseJournalDate } from '../lib/date'
 import type { Entry } from '../types'
-import type { YearIndex } from '../components/TimelineNav'
 
 export interface TimelineGroup {
   journalDate: string
@@ -56,18 +54,4 @@ export function groupByDate(entries: Entry[]): TimelineGroup[] {
     current.entries.push(e)
   }
   return groups
-}
-
-/** Build the year → months (both newest-first) index for the jump nav. */
-export function buildYearIndex(entries: Entry[]): YearIndex[] {
-  const byYear = new Map<number, Set<number>>()
-  for (const e of entries) {
-    const d = parseJournalDate(e.journalDate)
-    const set = byYear.get(d.getFullYear()) ?? new Set<number>()
-    set.add(d.getMonth())
-    byYear.set(d.getFullYear(), set)
-  }
-  return [...byYear.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .map(([year, months]) => ({ year, months: [...months].sort((a, b) => b - a) }))
 }

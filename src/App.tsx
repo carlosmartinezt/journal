@@ -5,6 +5,10 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { TimelinePage } from './pages/TimelinePage'
+import { CalendarPage } from './pages/CalendarPage'
+import { DayPage } from './pages/DayPage'
+import { OnThisDayPage } from './pages/OnThisDayPage'
+import { SearchPage } from './pages/SearchPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 // The editor pulls in TipTap/ProseMirror (the bulk of the bundle); load it on
@@ -37,6 +41,10 @@ export default function App() {
             {/* Primary tabs share the app shell. */}
             <Route element={<AppLayout />}>
               <Route index element={<TimelinePage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/day/:date" element={<DayPage />} />
+              <Route path="/on-this-day" element={<OnThisDayPage />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>

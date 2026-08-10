@@ -10,6 +10,15 @@ home screen and fully usable in airplane mode.
 Built with React + TypeScript + Vite, TipTap, Dexie (IndexedDB), Tailwind, and
 Supabase (Auth, Postgres, Storage).
 
+**Ways to navigate your journal** (all offline, reading from IndexedDB):
+
+- **Timeline** — reverse-chronological with sticky month separators and a
+  per-day date rail; rendered progressively for large histories.
+- **Calendar** — a scrolling month grid with entry-days highlighted; tap a day
+  to see its entries.
+- **On This Day** — everything written on today's calendar day across all years.
+- **Search** — instant full-text search over titles and body text.
+
 ---
 
 ## Table of contents

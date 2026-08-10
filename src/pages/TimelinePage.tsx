@@ -1,57 +1,52 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useTimeline, groupByDate, buildYearIndex } from '../hooks/useTimeline'
+import { useTimeline, groupByDate } from '../hooks/useTimeline'
 import { useNewEntry } from '../components/NewEntry'
-import { EntryCard } from '../components/EntryCard'
-import { formatDateHeader, parseJournalDate } from '../lib/date'
-import { YearMonthList, TimelineNavDrawer, monthAnchorId } from '../components/TimelineNav'
+import { EntryRow } from '../components/EntryRow'
+import { formatMonthYear, monthKey } from '../lib/date'
 
 /** How many entries to render initially and per "load more" step. */
 const PAGE = 40
 
 /**
- * The home screen: entries reverse-chronologically, grouped by day. Rendered
- * progressively — only a window of entries is mounted at a time, and more load
- * as you scroll — so a large history stays fast. A year/month jump nav scrolls
- * to a chosen month, expanding the window first if that month isn't mounted yet.
+ * Home screen: entries reverse-chronologically with sticky month separators
+ * and a per-day date rail. Rendered progressively (windowed) for large
+ * histories; more load as you scroll.
  */
 export function TimelinePage() {
   const { user } = useAuth()
   const { entries, loading, count } = useTimeline(user?.id)
   const { open } = useNewEntry()
-  const [navOpen, setNavOpen] = useState(false)
+  const navigate = useNavigate()
   const [visibleCount, setVisibleCount] = useState(PAGE)
-
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const pendingAnchor = useRef<string | null>(null)
 
-  // Full index (cheap — dates only, no cards) drives the jump nav.
-  const index = useMemo(() => buildYearIndex(entries), [entries])
-  const totalMonths = index.reduce((n, y) => n + y.months.length, 0)
-  const showNav = totalMonths > 1
-
-  // Only the windowed slice is grouped + rendered.
   const visible = useMemo(() => entries.slice(0, visibleCount), [entries, visibleCount])
   const groups = useMemo(() => groupByDate(visible), [visible])
 
-  // Anchor id for the first rendered day-group of each month.
-  const anchors = useMemo(() => {
-    const map = new Map<number, string>()
-    const seen = new Set<string>()
+  // Group indices that begin a new month → get a month separator.
+  const monthStarts = useMemo(() => {
+    const s = new Set<number>()
+    let last = ''
     groups.forEach((g, i) => {
-      const d = parseJournalDate(g.journalDate)
-      const key = `${d.getFullYear()}-${d.getMonth()}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        map.set(i, monthAnchorId(d.getFullYear(), d.getMonth()))
+      const mk = monthKey(g.journalDate)
+      if (mk !== last) {
+        s.add(i)
+        last = mk
       }
     })
-    return map
+    return s
   }, [groups])
 
-  const hasMore = visibleCount < count
+  const yearRange = useMemo(() => {
+    if (!entries.length) return ''
+    const newest = entries[0].journalDate.slice(0, 4)
+    const oldest = entries[entries.length - 1].journalDate.slice(0, 4)
+    return newest === oldest ? newest : `${oldest}–${newest}`
+  }, [entries])
 
-  // Infinite scroll: grow the window as the sentinel nears the viewport.
+  const hasMore = visibleCount < count
   useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
@@ -65,98 +60,56 @@ export function TimelinePage() {
     return () => obs.disconnect()
   }, [count, hasMore])
 
-  // After the window expands for a jump, scroll to the now-mounted anchor.
-  useEffect(() => {
-    if (!pendingAnchor.current) return
-    const id = pendingAnchor.current
-    pendingAnchor.current = null
-    requestAnimationFrame(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }, [visibleCount])
-
-  const jump = (year: number, month: number) => {
-    setNavOpen(false)
-    const targetIdx = entries.findIndex((e) => {
-      const d = parseJournalDate(e.journalDate)
-      return d.getFullYear() === year && d.getMonth() === month
-    })
-    if (targetIdx === -1) return
-    const id = monthAnchorId(year, month)
-    if (targetIdx >= visibleCount) {
-      // Expand the window to include the target month, then scroll (effect).
-      pendingAnchor.current = id
-      setVisibleCount(Math.min(count, targetIdx + PAGE))
-    } else {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }
-
   if (loading) {
     return <div className="px-6 py-16 text-center font-serif text-ink-faint">Loading…</div>
   }
-
   if (count === 0) return <EmptyState onNew={open} />
 
   return (
-    <div className="px-2">
-      <header className="flex items-center justify-between px-4 pb-2 pt-6">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight text-ink">Journal</h1>
-        {showNav && (
-          <button
-            onClick={() => setNavOpen(true)}
-            aria-label="Jump to date"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft active:bg-line xl:hidden"
-          >
-            <CalendarIcon />
-          </button>
-        )}
+    <div>
+      <header className="flex items-start justify-between px-4 pb-3 pt-6">
+        <div>
+          <h1 className="font-serif text-3xl font-semibold tracking-tight text-ink">Journal</h1>
+          {yearRange && <p className="mt-0.5 text-sm text-ink-faint">{yearRange}</p>}
+        </div>
+        <button
+          onClick={() => navigate('/search')}
+          aria-label="Search"
+          className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft active:bg-line"
+        >
+          <SearchIcon />
+        </button>
       </header>
 
-      {groups.map((group, i) => (
+      {groups.map((group, gi) => (
         <Fragment key={group.journalDate}>
-          {anchors.has(i) && <div id={anchors.get(i)} className="scroll-mt-4" aria-hidden />}
-          <section className="mb-4">
-            <h2 className="sticky top-0 z-10 bg-paper/90 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-ink-faint backdrop-blur-sm">
-              {formatDateHeader(group.journalDate)}
+          {monthStarts.has(gi) && (
+            <h2 className="sticky top-0 z-10 border-y border-line bg-paper/95 px-4 py-1.5 font-serif text-base font-semibold text-ink backdrop-blur-sm">
+              {formatMonthYear(group.journalDate)}
             </h2>
-            <div className="divide-y divide-line/70">
-              {group.entries.map((entry) => (
-                <EntryCard key={entry.id} entry={entry} />
-              ))}
+          )}
+          {group.entries.map((entry, ei) => (
+            <div key={entry.id} className="border-b border-line/50">
+              <EntryRow entry={entry} showDate={ei === 0} />
             </div>
-          </section>
+          ))}
         </Fragment>
       ))}
 
-      {/* Infinite-scroll sentinel + subtle loading hint. */}
       {hasMore && (
         <div ref={sentinelRef} className="py-6 text-center text-xs text-ink-faint">
           Loading earlier entries…
         </div>
       )}
-
-      {/* Persistent rail on wide screens (sits in the left gutter). */}
-      {showNav && (
-        <aside className="fixed left-6 top-28 hidden max-h-[68vh] w-44 overflow-y-auto xl:block">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-ink-faint">Jump to</p>
-          <YearMonthList index={index} onJump={jump} />
-        </aside>
-      )}
-
-      {/* Slide-in drawer on phones. */}
-      <TimelineNavDrawer index={index} open={navOpen} onClose={() => setNavOpen(false)} onJump={jump} />
     </div>
   )
 }
 
-function CalendarIcon() {
+function SearchIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   )
 }

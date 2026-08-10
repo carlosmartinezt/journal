@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupByDate, buildYearIndex } from '../src/hooks/useTimeline'
+import { groupByDate } from '../src/hooks/useTimeline'
 import type { Entry } from '../src/types'
 
 function entry(journalDate: string, createdAt: number): Entry {
@@ -35,11 +35,3 @@ describe('groupByDate', () => {
   })
 })
 
-describe('buildYearIndex', () => {
-  it('lists years and months present, both newest-first', () => {
-    const index = buildYearIndex(sorted)
-    expect(index.map((y) => y.year)).toEqual([2026, 2025, 2024])
-    expect(index[0].months).toEqual([7]) // August = 7 (0-based)
-    expect(index[2].months).toEqual([11]) // December = 11
-  })
-})
