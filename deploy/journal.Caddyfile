@@ -1,0 +1,26 @@
+# Caddy site block for journal.carlosmartinezt.com
+# Append this to /etc/caddy/Caddyfile on the server, then:
+#   sudo systemctl reload caddy
+#
+# Caddy serves the built SPA directly from the repo's dist/ (same pattern as
+# the main site). Rebuild with `npm run build` to publish changes — no copy
+# step. Auto-HTTPS works once DNS for the subdomain points at this server.
+
+journal.carlosmartinezt.com {
+    root * /home/carlos/journal/dist
+    encode gzip zstd
+
+    # The service worker + app shell must never be cached by the CDN/browser,
+    # so new deploys roll out immediately.
+    @noCache path /sw.js /index.html /manifest.webmanifest /registerSW.js
+    header @noCache Cache-Control "no-cache, no-store, must-revalidate"
+
+    # Fingerprinted build assets are immutable and safe to cache forever.
+    @assets path /assets/*
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+
+    # SPA fallback: unknown paths serve index.html so client-side routes work
+    # (and an offline deep-link is handled by the service worker).
+    try_files {path} /index.html
+    file_server
+}
