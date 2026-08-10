@@ -22,14 +22,15 @@ export function YearMonthList({
   onJump,
 }: {
   index: YearIndex[]
-  onJump: (anchorId: string) => void
+  /** Called with the target year and 0-based month. */
+  onJump: (year: number, month: number) => void
 }) {
   return (
     <nav className="space-y-4">
       {index.map(({ year, months }) => (
         <div key={year}>
           <button
-            onClick={() => onJump(monthAnchorId(year, months[0]))}
+            onClick={() => onJump(year, months[0])}
             className="mb-1.5 font-serif text-base font-semibold text-ink"
           >
             {year}
@@ -38,7 +39,7 @@ export function YearMonthList({
             {months.map((m) => (
               <button
                 key={m}
-                onClick={() => onJump(monthAnchorId(year, m))}
+                onClick={() => onJump(year, m)}
                 className="rounded-md px-1.5 py-0.5 text-xs text-ink-soft transition-colors hover:bg-line active:bg-line"
               >
                 {MONTHS[m]}
@@ -61,7 +62,7 @@ export function TimelineNavDrawer({
   index: YearIndex[]
   open: boolean
   onClose: () => void
-  onJump: (anchorId: string) => void
+  onJump: (year: number, month: number) => void
 }) {
   if (!open) return null
   return (

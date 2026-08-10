@@ -1,49 +1,73 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/local/db'
+import { parseJournalDate } from '../lib/date'
 import type { Entry } from '../types'
+import type { YearIndex } from '../components/TimelineNav'
 
 export interface TimelineGroup {
   journalDate: string
   entries: Entry[]
 }
 
-export interface TimelineResult {
-  groups: TimelineGroup[]
+export interface TimelineData {
+  /** Full list, sorted journalDate desc then createdAt desc. */
+  entries: Entry[]
   loading: boolean
   count: number
 }
 
 /**
- * Reactive timeline: all of a user's non-deleted entries, grouped by journal
- * date (newest day first) and, within a day, newest entry first. Reads live
- * from IndexedDB so it updates instantly on any local write — no network.
+ * Reactive timeline data: all of a user's non-deleted entries as a single
+ * sorted list. The page renders this progressively (windowed) so a large
+ * history doesn't mount thousands of cards at once. Reads live from IndexedDB.
  */
-export function useTimeline(userId: string | undefined): TimelineResult {
+export function useTimeline(userId: string | undefined): TimelineData {
   const entries = useLiveQuery(
     async () => {
       if (!userId) return [] as Entry[]
       const all = await db.entries.where('userId').equals(userId).toArray()
       return all
         .filter((e) => !e.deletedAt)
-        .sort((a, b) => b.createdAt - a.createdAt)
+        .sort((a, b) =>
+          a.journalDate === b.journalDate
+            ? b.createdAt - a.createdAt
+            : a.journalDate < b.journalDate
+              ? 1
+              : -1,
+        )
     },
     [userId],
     undefined, // undefined => still loading
   )
 
-  if (entries === undefined) {
-    return { groups: [], loading: true, count: 0 }
-  }
+  if (entries === undefined) return { entries: [], loading: true, count: 0 }
+  return { entries, loading: false, count: entries.length }
+}
 
-  const byDate = new Map<string, Entry[]>()
+/** Group an already-sorted entry list into consecutive day-groups. */
+export function groupByDate(entries: Entry[]): TimelineGroup[] {
+  const groups: TimelineGroup[] = []
+  let current: TimelineGroup | null = null
   for (const e of entries) {
-    const list = byDate.get(e.journalDate) ?? []
-    list.push(e)
-    byDate.set(e.journalDate, list)
+    if (!current || current.journalDate !== e.journalDate) {
+      current = { journalDate: e.journalDate, entries: [] }
+      groups.push(current)
+    }
+    current.entries.push(e)
   }
-  const groups: TimelineGroup[] = [...byDate.entries()]
-    .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // date desc
-    .map(([journalDate, list]) => ({ journalDate, entries: list }))
+  return groups
+}
 
-  return { groups, loading: false, count: entries.length }
+/** Build the year → months (both newest-first) index for the jump nav. */
+export function buildYearIndex(entries: Entry[]): YearIndex[] {
+  const byYear = new Map<number, Set<number>>()
+  for (const e of entries) {
+    const d = parseJournalDate(e.journalDate)
+    const set = byYear.get(d.getFullYear()) ?? new Set<number>()
+    set.add(d.getMonth())
+    byYear.set(d.getFullYear(), set)
+  }
+  return [...byYear.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([year, months]) => ({ year, months: [...months].sort((a, b) => b - a) }))
 }

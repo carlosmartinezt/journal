@@ -1,42 +1,40 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { useTimeline } from '../hooks/useTimeline'
+import { useTimeline, groupByDate, buildYearIndex } from '../hooks/useTimeline'
 import { useNewEntry } from '../components/NewEntry'
 import { EntryCard } from '../components/EntryCard'
 import { formatDateHeader, parseJournalDate } from '../lib/date'
-import {
-  YearMonthList,
-  TimelineNavDrawer,
-  monthAnchorId,
-  type YearIndex,
-} from '../components/TimelineNav'
+import { YearMonthList, TimelineNavDrawer, monthAnchorId } from '../components/TimelineNav'
+
+/** How many entries to render initially and per "load more" step. */
+const PAGE = 40
 
 /**
- * The home screen: entries in reverse-chronological order, grouped by day.
- * For long histories, a year/month jump nav (persistent rail on wide screens,
- * slide-in drawer on phones) scrolls the timeline to a chosen month.
+ * The home screen: entries reverse-chronologically, grouped by day. Rendered
+ * progressively — only a window of entries is mounted at a time, and more load
+ * as you scroll — so a large history stays fast. A year/month jump nav scrolls
+ * to a chosen month, expanding the window first if that month isn't mounted yet.
  */
 export function TimelinePage() {
   const { user } = useAuth()
-  const { groups, loading, count } = useTimeline(user?.id)
+  const { entries, loading, count } = useTimeline(user?.id)
   const { open } = useNewEntry()
   const [navOpen, setNavOpen] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(PAGE)
 
-  // Year → months present (both newest-first) for the jump nav.
-  const index = useMemo<YearIndex[]>(() => {
-    const byYear = new Map<number, Set<number>>()
-    for (const g of groups) {
-      const d = parseJournalDate(g.journalDate)
-      const set = byYear.get(d.getFullYear()) ?? new Set<number>()
-      set.add(d.getMonth())
-      byYear.set(d.getFullYear(), set)
-    }
-    return [...byYear.entries()]
-      .sort((a, b) => b[0] - a[0])
-      .map(([year, months]) => ({ year, months: [...months].sort((a, b) => b - a) }))
-  }, [groups])
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const pendingAnchor = useRef<string | null>(null)
 
-  // Which group index starts a new month → gets a scroll anchor.
+  // Full index (cheap — dates only, no cards) drives the jump nav.
+  const index = useMemo(() => buildYearIndex(entries), [entries])
+  const totalMonths = index.reduce((n, y) => n + y.months.length, 0)
+  const showNav = totalMonths > 1
+
+  // Only the windowed slice is grouped + rendered.
+  const visible = useMemo(() => entries.slice(0, visibleCount), [entries, visibleCount])
+  const groups = useMemo(() => groupByDate(visible), [visible])
+
+  // Anchor id for the first rendered day-group of each month.
   const anchors = useMemo(() => {
     const map = new Map<number, string>()
     const seen = new Set<string>()
@@ -51,12 +49,47 @@ export function TimelinePage() {
     return map
   }, [groups])
 
-  const totalMonths = index.reduce((n, y) => n + y.months.length, 0)
-  const showNav = totalMonths > 1
+  const hasMore = visibleCount < count
 
-  const jump = (anchorId: string) => {
-    document.getElementById(anchorId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Infinite scroll: grow the window as the sentinel nears the viewport.
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      (es) => {
+        if (es[0].isIntersecting) setVisibleCount((c) => Math.min(count, c + PAGE))
+      },
+      { rootMargin: '800px' },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [count, hasMore])
+
+  // After the window expands for a jump, scroll to the now-mounted anchor.
+  useEffect(() => {
+    if (!pendingAnchor.current) return
+    const id = pendingAnchor.current
+    pendingAnchor.current = null
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [visibleCount])
+
+  const jump = (year: number, month: number) => {
     setNavOpen(false)
+    const targetIdx = entries.findIndex((e) => {
+      const d = parseJournalDate(e.journalDate)
+      return d.getFullYear() === year && d.getMonth() === month
+    })
+    if (targetIdx === -1) return
+    const id = monthAnchorId(year, month)
+    if (targetIdx >= visibleCount) {
+      // Expand the window to include the target month, then scroll (effect).
+      pendingAnchor.current = id
+      setVisibleCount(Math.min(count, targetIdx + PAGE))
+    } else {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }
 
   if (loading) {
@@ -95,6 +128,13 @@ export function TimelinePage() {
           </section>
         </Fragment>
       ))}
+
+      {/* Infinite-scroll sentinel + subtle loading hint. */}
+      {hasMore && (
+        <div ref={sentinelRef} className="py-6 text-center text-xs text-ink-faint">
+          Loading earlier entries…
+        </div>
+      )}
 
       {/* Persistent rail on wide screens (sits in the left gutter). */}
       {showNav && (
