@@ -43,17 +43,33 @@ export function SettingsPage() {
         >
           Sync now
         </button>
-        <button
-          onClick={() => void syncEngine.reloadFromServer()}
-          disabled={!online}
-          className="mt-2 w-full rounded-xl border border-line py-3 text-center font-medium text-ink active:bg-line disabled:opacity-40"
-        >
-          Reload everything from server
-        </button>
-        <p className="px-1 pt-2 text-xs text-ink-faint">
-          Re-downloads all your entries from the server. Use this if a device is
-          missing entries. Your local changes are kept.
-        </p>
+
+        <details className="group mt-3">
+          <summary className="flex cursor-pointer list-none items-center gap-1 px-1 text-xs font-medium text-ink-faint [&::-webkit-details-marker]:hidden">
+            Advanced
+            <svg
+              className="transition-transform group-open:rotate-90"
+              width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"
+            >
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </summary>
+          <div className="mt-2">
+            <button
+              onClick={() => void syncEngine.reloadFromServer()}
+              disabled={!online}
+              className="w-full rounded-xl border border-line py-3 text-center text-sm font-medium text-ink active:bg-line disabled:opacity-40"
+            >
+              Reload everything from server
+            </button>
+            <p className="px-1 pt-2 text-xs text-ink-faint">
+              You shouldn’t normally need this — syncing is automatic. It forces a
+              full re-download from the server; use it only if a device seems to be
+              missing entries. Your local changes are kept.
+            </p>
+          </div>
+        </details>
       </Section>
 
       <Section title="Day One">
