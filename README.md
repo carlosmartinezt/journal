@@ -1,5 +1,7 @@
 # Journal
 
+**Live:** https://journal.carlosmartinezt.com/
+
 A calm, **offline-first** personal journaling PWA. Write, format, and attach
 photos with or without a connection; everything is stored locally first and
 synced to Supabase in the background when you're online. Installable to the
