@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppLayout } from './components/AppLayout'
 import { ScrollManager } from './components/ScrollManager'
 import { LoginPage } from './pages/LoginPage'
+import { DemoPage } from './pages/DemoPage'
 import { TimelinePage } from './pages/TimelinePage'
 import { CalendarPage } from './pages/CalendarPage'
 import { DayPage } from './pages/DayPage'
@@ -30,6 +31,7 @@ export default function App() {
         <ScrollManager />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/demo" element={<DemoPage />} />
           <Route element={<ProtectedRoute />}>
             {/* Full-screen editor (its own layout, no bottom nav). */}
             <Route

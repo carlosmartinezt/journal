@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
+import { DemoBanner } from './DemoBanner'
 import { DevPanel } from './DevPanel'
 import { NewEntryProvider } from './NewEntry'
 import { env } from '../lib/env'
@@ -14,7 +15,10 @@ export function AppLayout() {
   return (
     <NewEntryProvider>
       <div className="mx-auto flex min-h-full max-w-2xl flex-col">
-        <main className="flex-1 pb-28" style={{ paddingTop: 'var(--sat)' }}>
+        <div style={{ paddingTop: 'var(--sat)' }}>
+          <DemoBanner />
+        </div>
+        <main className="flex-1 pb-28">
           <Outlet />
         </main>
         <BottomNav />

@@ -1,6 +1,6 @@
 # Journal
 
-**Live:** https://journal.carlosmartinezt.com/
+**Live:** https://journal.carlosmartinezt.com/ · **Demo:** https://journal.carlosmartinezt.com/demo
 
 A calm, **offline-first** personal journaling PWA. Write, format, and attach
 photos with or without a connection; everything is stored locally first and
@@ -21,9 +21,28 @@ Supabase (Auth, Postgres, Storage).
 
 ---
 
+## Demo
+
+The login screen has a **See a demo** link (or go straight to
+[`/demo`](https://journal.carlosmartinezt.com/demo)) which opens a fictional
+two-year journal — no account, no sign-up.
+
+The demo is deliberately **local-only**: it seeds sample entries straight into
+IndexedDB and never configures the sync engine, so there is no shared account to
+vandalise and no backend quota to burn. Visitors can write, edit and delete
+freely; everything is erased when they leave. Sample photos are small hand-built
+SVG scenes, so the demo stays offline-capable and adds nothing to the network.
+
+Its content lives in [`src/demo/entries.ts`](src/demo/entries.ts) with dates
+expressed relative to today, so the demo always looks current and **On This Day**
+always has something to show. See [Demo mode](#demo-mode) for the details.
+
+---
+
 ## Table of contents
 
 - [Architecture](#architecture)
+- [Demo mode](#demo-mode)
 - [Project structure](#project-structure)
 - [Requirements](#requirements)
 - [Environment variables](#environment-variables)
@@ -89,6 +108,7 @@ src/
   db/
     local/       Dexie database + typed repositories (entries, photos, queue, meta)
     remote/      SupabaseGateway (implements the sync RemoteGateway port)
+  demo/          Public demo: sample journal, SVG scenes, local-only session
   editor/        TipTap editor hook + compact mobile toolbar
   hooks/         useTimeline, useEntry, usePhotos, useOnline, useSyncState, useCreateEntry…
   lib/           env, supabase client, content (TipTap↔text), date, id, logger
@@ -102,6 +122,44 @@ deploy/                Caddy site block
 ops/                   deploy.sh
 test/                  Vitest suites + in-memory fakes
 ```
+
+## Demo mode
+
+`src/demo/` contains everything the public demo needs:
+
+| File         | Role                                                                    |
+| ------------ | ----------------------------------------------------------------------- |
+| `user.ts`    | The demo identity, kept tiny so auth can import it without the content   |
+| `entries.ts` | The sample journal — prose plus relative dates                           |
+| `scenes.ts`  | Hand-built SVG "photos" stored as blobs, like any other photo            |
+| `session.ts` | Seed / enter / exit, loaded on demand (its own ~12 kB gzipped chunk)     |
+
+**How a date is chosen.** Every sample entry is placed relative to *today*, so
+the demo never goes stale:
+
+- `d` — N days ago. The default; keeps recent weeks dense.
+- `yearsAgo` — the same month + day N years ago. This is what fills **On This Day**.
+- `md` — the most recent occurrence of a calendar date (`"12-06"`), so entries
+  that mention frost or blossom stay in the right season. Never resolves into
+  the future.
+- `w` — additionally snap backwards to a weekday, for entries whose text names
+  one ("The market, Saturday").
+
+The entry list is written newest-first, the way the timeline shows it —
+including inside a cluster such as a trip, so its last day appears above its
+first. `test/demo.test.ts` enforces that ordering, which is what catches a
+"second day" accidentally dated before its arrival.
+
+**Safety properties**, all covered by tests:
+
+- Sample data is written with `syncStatus: 'synced'` and **queues nothing**, so
+  the demo never shows phantom pending changes.
+- The sync engine is **never configured** during a demo session — no network
+  calls are made at all.
+- Re-entering re-seeds **in place** (stable ids), refreshing dates without
+  duplicating entries.
+- Exiting deletes the sample entries, whatever the visitor wrote, *and any sync
+  ops those edits queued* — so nothing can follow them into a real account.
 
 ## Requirements
 

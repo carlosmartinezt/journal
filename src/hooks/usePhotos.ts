@@ -28,7 +28,10 @@ export function usePhotos(entryId: string | undefined): PhotoView[] {
 
   // Track live object URLs keyed by photo id so we can revoke stale ones.
   const urlsRef = useRef<Map<string, { blob: Blob; url: string }>>(new Map())
-  const [, forceRender] = useState(0)
+  // Bumped whenever the URL map changes. The view below must depend on this:
+  // the map is a ref, so without it the memo would keep serving the URLs it
+  // computed before the effect ran — i.e. null — and photos would never appear.
+  const [urlVersion, forceRender] = useState(0)
 
   useEffect(() => {
     const map = urlsRef.current
@@ -71,6 +74,9 @@ export function usePhotos(entryId: string | undefined): PhotoView[] {
         url: urlsRef.current.get(photo.id)?.url ?? null,
         loadingBytes: !photo.blob && !!photo.storagePath,
       })),
-    [photos],
+    // `urlVersion` looks unnecessary to the linter — it isn't. The URLs live in
+    // a ref, so this counter is the only thing that tells the memo they changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [photos, urlVersion],
   )
 }

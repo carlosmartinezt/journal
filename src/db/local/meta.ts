@@ -10,6 +10,7 @@ const KEYS = {
   cachedUser: 'cachedUser',
   pullCursor: 'pullCursor', // ISO timestamp of newest server row seen
   lastSyncedAt: 'lastSyncedAt',
+  demoMode: 'demoMode', // sample-data session; never syncs
 } as const
 
 async function get<T>(key: string): Promise<T | undefined> {
@@ -41,6 +42,19 @@ export const meta = {
   },
   async setLastSyncedAt(ts: number): Promise<void> {
     await set(KEYS.lastSyncedAt, ts)
+  },
+
+  /**
+   * Whether the app is running the local demo session. Persisted (rather than
+   * held in memory) so a reload — or a cold offline launch — stays in the demo
+   * instead of bouncing the visitor back to the login screen.
+   */
+  async getDemoMode(): Promise<boolean> {
+    return (await get<boolean>(KEYS.demoMode)) === true
+  },
+  async setDemoMode(on: boolean): Promise<void> {
+    if (on) await set(KEYS.demoMode, true)
+    else await db.appMeta.delete(KEYS.demoMode)
   },
 
   /** Clear per-user cursors on logout so a different account starts clean. */

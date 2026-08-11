@@ -10,9 +10,10 @@ type Mode = 'signin' | 'signup'
  * afterwards the cached session keeps the app usable offline.
  */
 export function LoginPage() {
-  const { status, signIn, signUp } = useAuth()
+  const { status, signIn, signUp, startDemo } = useAuth()
   const online = useOnline()
   const [mode, setMode] = useState<Mode>('signin')
+  const [demoBusy, setDemoBusy] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -102,6 +103,25 @@ export function LoginPage() {
           <>Already have an account? <span className="font-medium text-accent">Sign in</span></>
         )}
       </button>
+
+      {/* Try it without an account. The demo is entirely local — sample data
+          seeded on this device, never synced, wiped when the visitor leaves. */}
+      <div className="mt-10 border-t border-line pt-6 text-center">
+        <button
+          type="button"
+          onClick={async () => {
+            setDemoBusy(true)
+            await startDemo()
+          }}
+          disabled={demoBusy}
+          className="font-medium text-accent disabled:opacity-50"
+        >
+          {demoBusy ? 'Setting up the demo…' : 'See a demo →'}
+        </button>
+        <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+          Browse a sample journal — no account needed. Nothing leaves your device.
+        </p>
+      </div>
     </div>
   )
 }

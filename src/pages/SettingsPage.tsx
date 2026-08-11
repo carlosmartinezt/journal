@@ -8,9 +8,11 @@ import { DayOneSection } from '../components/DayOneSection'
 
 /** Minimal settings: account, sync status, offline info, version, logout. */
 export function SettingsPage() {
-  const { user, signOut } = useAuth()
+  const { user, isDemo, signOut } = useAuth()
   const online = useOnline()
   const sync = useSyncState()
+
+  if (isDemo) return <DemoSettings onExit={() => void signOut()} />
 
   return (
     <div className="px-5">
@@ -92,6 +94,63 @@ export function SettingsPage() {
 
       <p className="px-1 pb-8 pt-2 text-center text-xs text-ink-faint">
         Your journal is private. Only you can read your entries.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Settings while in the demo. Sync and Day One import are deliberately absent:
+ * there's no account to sync to, and inviting someone to import their real
+ * journal into a sandbox that gets wiped on exit would be a trap.
+ */
+function DemoSettings({ onExit }: { onExit: () => void }) {
+  return (
+    <div className="px-5">
+      <header className="px-1 pb-4 pt-6">
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-ink">Settings</h1>
+      </header>
+
+      <Section title="Demo">
+        <p className="px-1 py-1 text-sm leading-relaxed text-ink-soft">
+          You’re browsing a sample journal belonging to nobody. It lives entirely in
+          this browser — nothing is uploaded, and no account exists. Feel free to
+          write, edit, and delete: it’s all erased when you leave the demo.
+        </p>
+        <button
+          onClick={onExit}
+          className="mt-3 w-full rounded-xl bg-ink py-3 text-center font-medium text-paper active:opacity-80"
+        >
+          Exit demo
+        </button>
+      </Section>
+
+      <Section title="Things to try">
+        <ul className="space-y-1.5 px-1 py-1 text-sm leading-relaxed text-ink-soft">
+          <li>· Write an entry with ＋ — pick any date, past or present</li>
+          <li>· Scroll the calendar; tap a quiet day to start writing there</li>
+          <li>· Open “On this day” to see this date in earlier years</li>
+          <li>· Search across every entry — instantly, with no network</li>
+          <li>· Turn off your wifi. Everything keeps working.</li>
+        </ul>
+      </Section>
+
+      <Section title="Offline & installation">
+        <p className="px-1 py-1 text-sm leading-relaxed text-ink-soft">
+          This journal works fully offline. Entries and photos are stored on your
+          device first, then synced to your account when you’re back online. Add it
+          to your home screen (Share → “Add to Home Screen”) to launch it like a
+          native app.
+        </p>
+      </Section>
+
+      <Section title="About">
+        <Row label="Version" value={env.appVersion} />
+        <Row label="Mode" value="Demo (local only)" />
+      </Section>
+
+      <p className="px-1 pb-8 pt-2 text-center text-xs text-ink-faint">
+        With a real account, only you can read your entries.
       </p>
     </div>
   )

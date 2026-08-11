@@ -15,6 +15,7 @@ import { syncEngine } from '../sync/SyncEngine'
 import { meta } from '../db/local/meta'
 import { db } from '../db/local/db'
 import { log } from '../lib/logger'
+import { DEMO_USER } from '../demo/user'
 import type { CachedUser } from '../types'
 
 type AuthStatus = 'loading' | 'authed' | 'anon'
@@ -30,9 +31,13 @@ interface AuthResult {
 interface AuthContextValue {
   status: AuthStatus
   user: CachedUser | null
+  /** True while browsing the public sample journal (never syncs). */
+  isDemo: boolean
   signUp: (email: string, password: string) => Promise<AuthResult>
   signIn: (email: string, password: string) => Promise<AuthResult>
   signOut: () => Promise<void>
+  /** Enter the local demo session, seeding sample data. */
+  startDemo: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -40,7 +45,21 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [user, setUser] = useState<CachedUser | null>(null)
+  const [isDemo, setIsDemo] = useState(false)
   const configuredFor = useRef<string | null>(null)
+  // Mirrors isDemo for the auth-state listener, which closes over stale state.
+  const demoRef = useRef(false)
+
+  /** Enter/leave the demo without ever touching the sync engine. */
+  const activateDemo = useMemo(
+    () => () => {
+      demoRef.current = true
+      setIsDemo(true)
+      setUser(DEMO_USER)
+      setStatus('authed')
+    },
+    [],
+  )
 
   /** Attach a signed-in user to the sync engine + cache them for offline. */
   const activateUser = useMemo(
@@ -66,6 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     async function bootstrap() {
+      // A demo session wins over everything else: it's purely local, so we must
+      // not hand the demo user to the sync engine on reload.
+      if (await meta.getDemoMode()) {
+        if (!cancelled) activateDemo()
+        return
+      }
+
       // No backend configured → run local-only using any cached identity.
       if (!supabase) {
         const cached = await meta.getCachedUser()
@@ -100,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // React to token refreshes / sign-in / sign-out from the SDK.
     const sub = supabase?.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') return // handled explicitly in signOut
+      if (demoRef.current) return // a stale session must not hijack the demo
       if (session?.user) {
         void activateUser({ id: session.user.id, email: session.user.email ?? null })
       }
@@ -109,7 +136,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true
       sub?.data.subscription.unsubscribe()
     }
-  }, [activateUser])
+  }, [activateUser, activateDemo])
+
+  const startDemo = useMemo(
+    () => async () => {
+      // Loaded on demand — the sample journal and its illustrations stay out
+      // of the bundle for everyone who never opens the demo.
+      const { enterDemo } = await import('../demo/session')
+      await enterDemo()
+      activateDemo()
+    },
+    [activateDemo],
+  )
 
   const signUp = useMemo(
     () =>
@@ -156,6 +194,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useMemo(
     () =>
       async () => {
+        // Leaving the demo: purge the sample journal and anything the visitor
+        // wrote in it, including queued ops, so nothing can leak into a real
+        // account they sign into afterwards.
+        if (demoRef.current) {
+          const { exitDemo } = await import('../demo/session')
+          await exitDemo()
+          demoRef.current = false
+          setIsDemo(false)
+          setUser(null)
+          setStatus('anon')
+          return
+        }
+
         syncEngine.stop()
         syncEngine.clearSession()
         configuredFor.current = null
@@ -180,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const value: AuthContextValue = { status, user, signUp, signIn, signOut }
+  const value: AuthContextValue = { status, user, isDemo, signUp, signIn, signOut, startDemo }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
