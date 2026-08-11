@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useTimeline } from '../hooks/useTimeline'
 import { useCreateEntry } from '../hooks/useCreateEntry'
@@ -18,6 +18,11 @@ export function DayPage() {
     () => entries.filter((e) => e.journalDate === date).sort((a, b) => b.createdAt - a.createdAt),
     [entries, date],
   )
+
+  // A day with a single entry opens that entry directly (also covers deep links).
+  if (!loading && dayEntries.length === 1) {
+    return <Navigate to={`/entry/${dayEntries[0].id}`} replace />
+  }
 
   return (
     <div>
