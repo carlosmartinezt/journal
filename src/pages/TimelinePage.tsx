@@ -9,6 +9,10 @@ import { formatMonthYear, monthKey } from '../lib/date'
 /** How many entries to render initially and per "load more" step. */
 const PAGE = 40
 
+/** Persist the loaded window size across navigation so returning to the
+ *  timeline restores both the rendered height and the scroll position. */
+let lastVisibleCount = PAGE
+
 /**
  * Home screen: entries reverse-chronologically with sticky month separators
  * and a per-day date rail. Rendered progressively (windowed) for large
@@ -19,8 +23,12 @@ export function TimelinePage() {
   const { entries, loading, count } = useTimeline(user?.id)
   const { open } = useNewEntry()
   const navigate = useNavigate()
-  const [visibleCount, setVisibleCount] = useState(PAGE)
+  const [visibleCount, setVisibleCount] = useState(lastVisibleCount)
   const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    lastVisibleCount = visibleCount
+  }, [visibleCount])
 
   const visible = useMemo(() => entries.slice(0, visibleCount), [entries, visibleCount])
   const groups = useMemo(() => groupByDate(visible), [visible])

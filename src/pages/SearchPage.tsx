@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useTimeline } from '../hooks/useTimeline'
 import { EntryRow } from '../components/EntryRow'
+import { useBack } from '../hooks/useBack'
 
 const MAX_RESULTS = 200
+
+/** Remember the last query so returning from an entry restores the search. */
+let lastQuery = ''
 
 /**
  * Full-text search over titles + body text. Entries already live in IndexedDB,
@@ -13,13 +16,17 @@ const MAX_RESULTS = 200
 export function SearchPage() {
   const { user } = useAuth()
   const { entries } = useTimeline(user?.id)
-  const navigate = useNavigate()
-  const [q, setQ] = useState('')
+  const back = useBack('/')
+  const [q, setQ] = useState(lastQuery)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+    lastQuery = q
+  }, [q])
+
+  useEffect(() => {
+    if (!q) inputRef.current?.focus()
+  }, [q])
 
   // Precompute a lowercase haystack per entry so keystrokes stay cheap.
   const index = useMemo(
@@ -42,7 +49,7 @@ export function SearchPage() {
     <div>
       <header className="flex items-center gap-2 border-b border-line px-3 py-2 pt-6">
         <button
-          onClick={() => navigate(-1)}
+          onClick={back}
           aria-label="Back"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft active:bg-line"
         >

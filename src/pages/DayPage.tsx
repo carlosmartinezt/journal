@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useTimeline } from '../hooks/useTimeline'
 import { useCreateEntry } from '../hooks/useCreateEntry'
+import { useBack } from '../hooks/useBack'
 import { EntryRow } from '../components/EntryRow'
 import { formatDayFull } from '../lib/date'
 
@@ -11,7 +12,7 @@ export function DayPage() {
   const { date = '' } = useParams<{ date: string }>()
   const { user } = useAuth()
   const { entries, loading } = useTimeline(user?.id)
-  const navigate = useNavigate()
+  const back = useBack('/calendar')
   const createEntry = useCreateEntry()
 
   const dayEntries = useMemo(
@@ -28,7 +29,7 @@ export function DayPage() {
     <div>
       <header className="flex items-center justify-between border-b border-line px-3 py-2 pt-6">
         <button
-          onClick={() => navigate(-1)}
+          onClick={back}
           aria-label="Back"
           className="flex items-center gap-1 rounded-lg px-2 py-1 text-ink-soft active:bg-line"
         >

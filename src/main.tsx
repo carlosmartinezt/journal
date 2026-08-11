@@ -10,6 +10,10 @@ import { registerSW } from 'virtual:pwa-register'
 // is never touched by SW updates.
 registerSW({ immediate: true })
 
+// Take manual control of scroll restoration so our per-screen memory (native
+// back/tab behaviour) isn't overridden by the browser's heuristic.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

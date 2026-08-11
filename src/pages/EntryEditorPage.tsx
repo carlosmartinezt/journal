@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useBack } from '../hooks/useBack'
 import { useEntry } from '../hooks/useEntry'
 import { useAuth } from '../auth/AuthContext'
 import { entriesRepo } from '../db/local/entriesRepo'
@@ -16,14 +17,14 @@ import type { Entry, TipTapDoc } from '../types'
 export function EntryEditorPage() {
   const { id } = useParams<{ id: string }>()
   const entry = useEntry(id)
-  const navigate = useNavigate()
+  const back = useBack('/')
 
   if (entry === undefined) {
     return <div className="px-6 py-16 text-center font-serif text-ink-faint">Loading…</div>
   }
   if (entry === null) {
-    // Deleted or missing — return to the timeline.
-    return <MissingEntry onBack={() => navigate('/')} />
+    // Deleted or missing — return to wherever the user came from.
+    return <MissingEntry onBack={back} />
   }
   // Remount when the entry id changes so the editor re-initialises cleanly.
   return <EntryEditorInner key={entry.id} entry={entry} />
@@ -32,7 +33,7 @@ export function EntryEditorPage() {
 const SAVE_DEBOUNCE_MS = 400
 
 function EntryEditorInner({ entry }: { entry: Entry }) {
-  const navigate = useNavigate()
+  const back = useBack('/')
   const { user } = useAuth()
   const media = getPlatform().media
 
@@ -113,7 +114,7 @@ function EntryEditorInner({ entry }: { entry: Entry }) {
   const remove = async () => {
     await entriesRepo.softDelete(entry.id)
     syncEngine.requestSync('delete')
-    navigate('/')
+    back()
   }
 
   return (
@@ -124,14 +125,14 @@ function EntryEditorInner({ entry }: { entry: Entry }) {
         style={{ paddingTop: 'calc(var(--sat) + 0.5rem)' }}
       >
         <button
-          onClick={() => navigate('/')}
-          aria-label="Back to journal"
+          onClick={back}
+          aria-label="Back"
           className="flex items-center gap-1 rounded-lg px-2 py-1 text-ink-soft active:bg-line"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
-          <span className="text-sm">Journal</span>
+          <span className="text-sm">Back</span>
         </button>
 
         <SaveIndicator saving={saving} />

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppLayout } from './components/AppLayout'
+import { ScrollManager } from './components/ScrollManager'
 import { LoginPage } from './pages/LoginPage'
 import { TimelinePage } from './pages/TimelinePage'
 import { CalendarPage } from './pages/CalendarPage'
@@ -26,6 +27,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollManager />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>

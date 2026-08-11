@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useTimeline } from '../hooks/useTimeline'
@@ -19,7 +19,6 @@ export function CalendarPage() {
   const { entries, loading } = useTimeline(user?.id)
   const navigate = useNavigate()
   const createEntry = useCreateEntry()
-  const didInitialScroll = useRef(false)
 
   // Entry ids per day, so we can route: empty → new entry, one → that entry,
   // many → the day list.
@@ -60,15 +59,6 @@ export function CalendarPage() {
     }
     return list
   }, [entries, today])
-
-  // Land on the most recent month (bottom) once the data is in.
-  useLayoutEffect(() => {
-    if (loading || didInitialScroll.current || months.length === 0) return
-    didInitialScroll.current = true
-    const toBottom = () => window.scrollTo(0, document.body.scrollHeight)
-    toBottom()
-    requestAnimationFrame(toBottom) // re-run after fonts/layout settle
-  }, [loading, months.length])
 
   if (loading) {
     return <div className="px-6 py-16 text-center font-serif text-ink-faint">Loading…</div>
