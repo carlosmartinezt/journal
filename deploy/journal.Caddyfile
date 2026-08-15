@@ -10,6 +10,19 @@ journal.carlosmartinezt.com {
     root * /home/carlos/journal/dist
     encode gzip zstd
 
+    # Security headers. The CSP locks scripts to this origin and network calls
+    # to this origin + Supabase, so an injected script (or a stolen-token
+    # exfiltration attempt) has nowhere to run or phone home. blob: covers the
+    # object URLs used to display photo blobs from IndexedDB; style 'unsafe-inline'
+    # is required by React/TipTap inline style attributes.
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://ajnzymnxyyqozilchdyz.supabase.co wss://ajnzymnxyyqozilchdyz.supabase.co; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-Frame-Options "DENY"
+    }
+
     # The service worker + app shell must never be cached by the CDN/browser,
     # so new deploys roll out immediately.
     @noCache path /sw.js /index.html /manifest.webmanifest /registerSW.js
