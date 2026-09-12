@@ -118,8 +118,8 @@ src/
   types/         Domain types shared across UI / local / remote / sync
 supabase/migrations/   SQL: schema, indexes, RLS, storage policies
 scripts/               Migration runner, icon generator, test-user helper
-deploy/                Caddy site block
-ops/                   deploy.sh
+deploy/                Caddy site block (self-hosting fallback, not the live path)
+ops/                   deploy.sh (build + `vercel deploy --prod`)
 test/                  Vitest suites + in-memory fakes
 ```
 
@@ -183,6 +183,12 @@ committed.
 
 If `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are absent the app still runs
 in **local-only** mode (offline store works; remote sync is disabled).
+
+On Vercel these are set per environment (`vercel env ls production`). They are
+read at **build** time and baked into the bundle, so changing one needs a
+redeploy, not just a restart. If they are only set for Production, preview
+deployments build without them and silently run in local-only mode: set them for
+Preview too, or expect previews to have no sync.
 
 ## Supabase setup
 
@@ -362,28 +368,52 @@ which also runs inside a Capacitor WebView.
 
 ## Deployment
 
-The frontend is a static SPA — deploy `dist/` to any static host
-(Vercel, Netlify, Cloudflare Pages) or serve it directly. No server-side runtime
-is required; Supabase is the backend.
-
-**This project (journal.carlosmartinezt.com), served by Caddy on the host:**
+**Vercel is the canonical target.** The app is a static SPA, so Vercel builds the
+Vite bundle and serves `dist/` from its CDN. There is no server-side runtime:
+no `api/` routes, no SSR, no middleware. Journal data never passes through
+Vercel, the browser talks to the backend directly.
 
 ```bash
-./ops/deploy.sh        # npm ci + build → dist/
+./ops/deploy.sh        # build, then `vercel deploy --prod`, then verify prod returns 200
 ```
 
-One-time wiring (needs sudo + DNS):
+Or straight from the CLI:
 
-1. Add a DNS record for `journal.carlosmartinezt.com` pointing at the server.
-2. Append the site block and reload Caddy:
-   ```bash
-   sudo sh -c 'cat deploy/journal.Caddyfile >> /etc/caddy/Caddyfile'
-   sudo systemctl reload caddy
-   ```
+```bash
+vercel deploy --prod
+```
 
-Caddy serves the SPA directly from `dist/` with a client-side-routing fallback,
-long-cache for fingerprinted assets, and no-cache for the service worker + shell
-so updates roll out immediately. Auto-HTTPS activates once DNS resolves.
+Pushes to `main` also deploy if the Git integration is connected; `ops/deploy.sh`
+is the deliberate path and is what `/yolo` runs.
+
+[`vercel.json`](vercel.json) holds the whole platform config: `framework: vite`,
+`outputDirectory: dist`, a SPA rewrite that excludes `assets/`, the service
+worker and the manifest, immutable long-cache for fingerprinted assets, and
+`no-store` for `sw.js` / `index.html` / the manifest so updates roll out at once.
+
+Build-time config lives in the Vercel project's environment variables, not in
+the repo (`.env` is gitignored):
+
+```bash
+vercel env ls production
+```
+
+See [Environment variables](#environment-variables) for which ones, and for the
+preview-deployment caveat.
+
+### Self-hosting (alternative, not used)
+
+[`deploy/journal.Caddyfile`](deploy/journal.Caddyfile) is kept as a working
+site block for serving `dist/` from a box behind Caddy: client-side-routing
+fallback, long-cache for fingerprinted assets, no-cache for the service worker
+and shell. Wiring it up means a DNS record pointing at the server plus:
+
+```bash
+sudo sh -c 'cat deploy/journal.Caddyfile >> /etc/caddy/Caddyfile'
+sudo systemctl reload caddy
+```
+
+Nothing in the app depends on this; it is a fallback, not the live setup.
 
 ## Known PWA limitations on iOS / Safari
 

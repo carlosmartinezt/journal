@@ -1,4 +1,8 @@
 # Caddy site block for journal.carlosmartinezt.com
+#
+# NOT THE LIVE SETUP. Vercel is the canonical deploy target (see README
+# → Deployment, and ops/deploy.sh). This block is kept as a working
+# self-hosting fallback only.
 # Append this to /etc/caddy/Caddyfile on the server, then:
 #   sudo systemctl reload caddy
 #
