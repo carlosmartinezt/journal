@@ -441,3 +441,7 @@ Nothing in the app depends on this; it is a fallback, not the live setup.
 - The auth session persists through the `SecureStoragePort` (localStorage on
   web; swappable for the OS keychain on native).
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
